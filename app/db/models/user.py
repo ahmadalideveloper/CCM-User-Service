@@ -1,7 +1,11 @@
 from sqlalchemy import Column, String, Integer, Boolean, ForeignKey, BigInteger, Date, Text
-from app.db.base import Base
+from sqlalchemy.orm import relationship
 
-class User(Base):
+from app.db.base_class import Base
+from app.db.models.base import BaseModelMixin
+from app.db.base_class import Base
+
+class User(Base, BaseModelMixin):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -12,6 +16,8 @@ class User(Base):
     gender = Column(String(2), default="M")
     email = Column(String(254), unique=True, nullable=True)
     is_email_verified = Column(Boolean, default=False)
+    username = Column(String(255), unique=True, index=True, nullable=False)
+    password = Column(String(255), nullable=False)
     phone_number = Column(String(12), nullable=False)
     phone_number_type = Column(String(10), default="CELL")
     secondary_phone_number = Column(String(12), nullable=True)
@@ -21,8 +27,6 @@ class User(Base):
     image = Column(Text, nullable=True)
     date_of_birth = Column(Date, nullable=True)
     is_two_factor_enabled = Column(Boolean, default=False)
-    created_at = Column(BigInteger)
-    updated_at = Column(BigInteger, nullable=True)
-    is_removed = Column(Boolean, default=False)
-    is_test_account = Column(Boolean, default=False)
-    account_status = Column(String(25), default="ACTIVE")
+    role_id = Column(Integer, ForeignKey("roles.id"), nullable=False)
+    role = relationship("Role", back_populates="users")
+
