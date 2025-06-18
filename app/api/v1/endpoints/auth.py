@@ -8,6 +8,8 @@ from app.db.session import get_db
 from starlette.status import HTTP_401_UNAUTHORIZED
 from app.exceptions.api_exception import APIException
 from app.core.security import create_access_token
+from starlette.concurrency import run_in_threadpool
+
 
 
 
@@ -18,9 +20,8 @@ router = APIRouter()
     404: {"model": ErrorResponse},
     422: {"model": ErrorResponse},
 })
-def login(payload: LoginRequestSchema,db: Session = Depends(get_db)):
-    user = authenticate_user(db,payload.email, payload.password)
-
+async def login(payload: LoginRequestSchema,db: Session = Depends(get_db)):
+    user = await run_in_threadpool(authenticate_user, db, payload.username, payload.password)
     if not user:
         raise APIException(
             message=rc.ERROR_INVALID_CREDENTIALS,
@@ -28,7 +29,7 @@ def login(payload: LoginRequestSchema,db: Session = Depends(get_db)):
             status_code=HTTP_401_UNAUTHORIZED
         )
 
-    access_token = create_access_token(user.id)
+    access_token = create_access_token(user.id,user.role.id)
     
     return SuccessResponse(
         message=rc.SUCCESS_LOGIN,
