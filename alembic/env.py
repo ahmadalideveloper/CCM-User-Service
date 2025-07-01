@@ -17,9 +17,12 @@ from app.db.models.user import User
 from app.db.models.role import Role
 from app.db.models.permission import PermissionAction
 from app.db.models.route import RouteModule
+from app.db.models.module_component import ModuleComponent
 from app.db.models.route_permission import RoutePermission
 from app.db.models.role_permission import RolePermission
-from app.db.models.user_permission import UserPermission # 👈 this line ensures the User model is imported
+from app.db.models.user_permission import UserPermission 
+from app.db.models.otp import OTPCode
+# 👈 this line ensures the User model is imported
 target_metadata = Base.metadata
 
 

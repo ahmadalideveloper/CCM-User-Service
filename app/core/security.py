@@ -1,6 +1,10 @@
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+from typing import Optional, Dict, Any
+from app.core.config import settings # Assuming you have app settings for SECRET_KEY
+
+
 
 SECRET_KEY = "your_secret_key"
 ALGORITHM = "HS256"
@@ -19,11 +23,22 @@ def verify_password(plain_password, hashed_password):
 def get_password_hash(password):
     return pwd_context.hash(password)
 
-def create_access_token(user_id: int, role_id: int, expires_delta: timedelta = None):
-    to_encode = {"sub": str(user_id), "role_id": role_id} 
-    expire = datetime.now() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+# def create_access_token(user_id: int, role_id: int, expires_delta: timedelta = None):
+#     to_encode = {"sub": str(user_id), "role_id": role_id} 
+#     expire = datetime.now() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+#     to_encode.update({"exp": expire})
+#     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+# --- Existing create_access_token (no change needed) ---
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.now() + expires_delta
+    else:
+        expire = datetime.now() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
 
 def decode_access_token(token: str):
     try:

@@ -9,6 +9,11 @@ class Settings:
     MYSQL_HOST = os.getenv("MYSQL_HOST")
     MYSQL_PORT = os.getenv("MYSQL_PORT", 3306)
     MYSQL_DB = os.getenv("MYSQL_DB")
+    
+    SECRET_KEY = os.getenv("SECRET_KEY")
+    ALGORITHM = os.getenv("ALGORITHM")
+    ACCESS_TOKEN_EXPIRE_MINUTES = os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES",60)
+
 
     SQLALCHEMY_DATABASE_URL = (
         f"mysql+pymysql://{MYSQL_USER}:{MYSQL_PASSWORD}@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DB}"

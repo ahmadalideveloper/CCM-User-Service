@@ -18,6 +18,7 @@ class User(Base, BaseModelMixin):
     is_email_verified = Column(Boolean, default=False)
     username = Column(String(255), unique=True, index=True, nullable=False)
     password = Column(String(255), nullable=False)
+    is_first_login_completed = Column(Boolean, default = False)
     phone_number = Column(String(12), nullable=False)
     phone_number_type = Column(String(10), default="CELL")
     secondary_phone_number = Column(String(12), nullable=True)
@@ -26,7 +27,7 @@ class User(Base, BaseModelMixin):
     is_secondary_phone_number_used_for_sms = Column(Boolean, default=False)
     image = Column(Text, nullable=True)
     date_of_birth = Column(Date, nullable=True)
-    is_two_factor_enabled = Column(Boolean, default=False)
+    mfa_enabled = Column(Boolean, default=False)
     role_id = Column(Integer, ForeignKey("roles.id"), nullable=False)
     role = relationship("Role", back_populates="users")
 

@@ -5,22 +5,107 @@ from app.db.models.route import RouteModule
 from app.db.models.role import Role
 from app.db.models.permission import PermissionAction
 from app.db.models.route_permission import RoutePermission
+from app.db.models.module_component import ModuleComponent
+from app.db.models.role_permission import RolePermission
 from app.db.models.user import User  # <--- Import your User model here
 from app.core.security import hash_password
 
 def seed_route_modules_and_permissions():
     db = SessionLocal()
 
-    route_data = {
-        "Home": ["is_create", "is_read", "is_update", "is_delete"],
-        "Users": ["is_create", "is_read", "is_update", "is_delete", "is_download"],
-        "Patients": ["is_create", "is_read", "is_update", "is_delete", "bulk_upload"],
-        "CCM": ["is_create", "is_read", "is_update", "is_delete", "merge"],
-        "Settings": ["is_read", "is_update"]
+    # Clear existing data for clean seeding (order is CRITICAL for foreign keys)
+    # Delete child tables before parent tables
+    db.query(RolePermission).delete()      # <--- Delete RolePermission first as it depends on RoutePermission
+    db.query(RoutePermission).delete()     # <--- Then delete RoutePermission
+    db.query(ModuleComponent).delete()     # <--- Then delete ModuleComponent (depends on RouteModule)
+    db.query(RouteModule).delete()         # <--- Then delete RouteModule
+    db.query(PermissionAction).delete()    # <--- PermissionAction can be deleted here (or earlier), as nothing else depends on it in this context.
+    db.commit()
+
+    # Define the structure including modules, components, and their actions
+    # This reflects your screenshot's hierarchy
+    route_structure = {
+        "Facilities": {
+            "actions": ["is_create", "is_read", "is_update", "is_delete", "bulk_update"],
+            "components": {} # No explicit components for Facilities
+        },
+        "RPM": {
+            "actions": ["is_create", "is_read", "is_update", "is_delete", "merge", "bulk_update"],
+            "components": {} # No explicit components for RPM
+        },
+        "CCM": {
+            "actions": [], # CCM itself might not have direct actions, only its components
+            "components": {
+                "Medication Review": ["is_create", "is_read", "is_update", "is_delete"],
+                "Past Medical And Surgical History": ["is_create", "is_read", "is_update", "is_delete"],
+                "Quick Notes": ["is_create", "is_read", "is_update", "is_delete"],
+                "Insurances": ["is_create", "is_read", "is_update", "is_delete"],
+                "Vitals": ["is_create", "is_read", "is_update", "is_delete"],
+                "Documents": ["is_create", "is_read", "is_update", "is_delete", "merge", "share"],
+                "Hospitalization": ["is_create", "is_read", "is_update", "is_delete"],
+                "Medical Condition": ["is_create", "is_read", "is_update", "is_delete"],
+                "Nutritionist Review": ["is_create", "is_read", "is_update", "is_delete"],
+                "Other Medical Conditions": ["is_create", "is_read", "is_update", "is_delete"],
+                "Allergies": ["is_create", "is_read", "is_update", "is_delete"],
+                "Service Log": ["is_create", "is_read", "is_update"],
+                "Survey": ["is_create", "is_read", "is_update"],
+                "Progress Notes": ["is_create", "is_read", "is_update", "is_delete"],
+            }
+        },
+        "Billing": {
+            "actions": ["is_create", "is_read", "is_update", "is_delete", "merge", "bulk_update"],
+            "components": {}
+        },
+        "COMMUNICATION": {
+            "actions": [], # COMMUNICATION itself might not have direct actions
+            "components": {
+                "Calls": ["is_create", "is_read", "is_update", "is_delete"],
+                "SMS": ["is_create", "is_read", "is_update", "is_delete"],
+                "Mail": ["is_create", "is_read", "is_update", "is_delete"],
+                "Message": ["is_create", "is_read", "is_update", "is_delete"],
+                "Fax": ["is_create", "is_read", "is_update"],
+            }
+        },
+        # Add other top-level modules like "Home", "Users", "Patients", "Settings"
+        # from your previous seed, assuming they don't have components for now.
+        "Home": {
+            "actions": ["is_create", "is_read", "is_update", "is_delete"],
+            "components": {}
+        },
+        "Users": {
+            "actions": ["is_create", "is_read", "is_update", "is_delete", "is_download"],
+            "components": {}
+        },
+        "Patients": {
+            "actions": ["is_create", "is_read", "is_update", "is_delete", "bulk_upload"],
+            "components": {}
+        },
+        "Settings": {
+            "actions": ["is_read", "is_update"],
+            "components": {}
+        }
     }
 
-    for module_name, actions in route_data.items():
-        # 1. Create or fetch RouteModule
+    # First, ensure all possible PermissionActions exist
+    all_action_names = set()
+    for module_data in route_structure.values():
+        all_action_names.update(module_data["actions"])
+        for component_actions in module_data["components"].values():
+            all_action_names.update(component_actions)
+    
+    action_objects = {}
+    for action_name in all_action_names:
+        action = db.query(PermissionAction).filter_by(name=action_name).first()
+        if not action:
+            action = PermissionAction(name=action_name, label=action_name.replace("_", " ").capitalize())
+            db.add(action)
+            db.commit() # Commit immediately to get ID for refresh
+            db.refresh(action)
+        action_objects[action_name] = action
+    print("✅ Permission actions ensured.")
+
+    # Now, process modules and components
+    for module_name, module_info in route_structure.items():
         route_module = db.query(RouteModule).filter_by(name=module_name).first()
         if not route_module:
             route_module = RouteModule(name=module_name, description=f"{module_name} module")
@@ -28,31 +113,54 @@ def seed_route_modules_and_permissions():
             db.commit()
             db.refresh(route_module)
 
-        for action_name in actions:
-            # 2. Create or fetch PermissionAction
-            action = db.query(PermissionAction).filter_by(name=action_name).first()
-            if not action:
-                action = PermissionAction(name=action_name, label=action_name.replace("_", " ").capitalize())
-                db.add(action)
-                db.commit()
-                db.refresh(action)
-
-            # 3. Create RoutePermission if not exists
+        # Seed Module-level Permissions
+        for action_name in module_info["actions"]:
+            action = action_objects[action_name]
             route_perm = db.query(RoutePermission).filter_by(
                 route_module_id=route_module.id,
-                action_id=action.id
+                action_id=action.id,
+                module_component_id=None # Ensure it's a module-level permission
             ).first()
-
             if not route_perm:
-                route_perm = RoutePermission(
+                db.add(RoutePermission(
                     route_module_id=route_module.id,
-                    action_id=action.id
+                    action_id=action.id,
+                    module_component_id=None # Explicitly set to None
+                ))
+        
+        # Seed Components and Component-level Permissions
+        for component_name, component_actions in module_info["components"].items():
+            module_component = db.query(ModuleComponent).filter_by(
+                name=component_name,
+                route_module_id=route_module.id
+            ).first()
+            if not module_component:
+                module_component = ModuleComponent(
+                    name=component_name,
+                    description=f"{component_name} component of {module_name}",
+                    route_module_id=route_module.id
                 )
-                db.add(route_perm)
+                db.add(module_component)
+                db.commit() # Commit immediately to get ID for refresh
+                db.refresh(module_component)
 
-    db.commit()
+            for action_name in component_actions:
+                action = action_objects[action_name]
+                route_perm = db.query(RoutePermission).filter_by(
+                    module_component_id=module_component.id,
+                    action_id=action.id,
+                    route_module_id=None # Ensure it's a component-level permission
+                ).first()
+                if not route_perm:
+                    db.add(RoutePermission(
+                        module_component_id=module_component.id,
+                        action_id=action.id,
+                        route_module_id=None # Explicitly set to None
+                    ))
+    
+    db.commit() # Final commit for all new RoutePermissions
     db.close()
-    print("✅ Route modules, actions, and permissions seeded successfully.")
+    print("✅ Route modules, components, actions, and permissions seeded successfully.")
 
 
 def seed_roles():
